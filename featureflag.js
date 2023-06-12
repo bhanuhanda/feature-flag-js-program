@@ -13,7 +13,7 @@ function fetchAllFeatures() {
 
 let globalCache = {}
 let devOrderrides = {}
-addDevOrderride('feedback-dialog', 'test1');
+addDevOrderride('feedback-dialog', 'test1'); // synchronous thread
 
 var fetchedAlready = false;
 
@@ -21,12 +21,10 @@ function getFeatureState(flagKey) {
     return new Promise(function (resolve, reject) {
         if(!fetchedAlready) {
             console.log('sent from network');
-            fetchedAlready = false; // set true to enable caching
+            fetchedAlready = true; // set true to enable caching
 
             fetchAllFeatures().then(features => {
-                console.log({ features })
                 globalCache = {...features, ...devOrderrides};
-                console.log({ globalCache })
 
                 if(globalCache[flagKey]) {
                     resolve(globalCache[flagKey]);
@@ -57,19 +55,30 @@ function addDevOrderride(flag, value) {
 }
 
 // src/feature-x/summary.js
-getFeatureState("extended-summary")
-.then(function(featureValue) {
-    console.log(featureValue);
-}).catch(function() {
-    console.log('flag key does not exist');
-});
+// asynchronous thread
+// getFeatureState("extended-summary")
+// .then(function(featureValue) {
+//     console.log(featureValue);
+// }).catch(function() {
+//     console.log('flag key does not exist');
+// });
 
 // src/feature-y/feedback-dialog.js
-getFeatureState("feedback-dialog")
-.then(function(featureValue) {
-  console.log(featureValue);
-}).catch(function () {
-    console.log('flag key does not exist');
-});
+// asynchronous thread (falls into race condition as JS engine runs below line before above Promise is resolved & globalCache is set
+// so either write this call in above's .then call or use async await on the returned promise.
+// getFeatureState("feedback-dialog")
+// .then(function(featureValue) {
+//   console.log(featureValue);
+// }).catch(function () {
+//     console.log('flag key does not exist');
+// });
 
-addDevOrderride('extended-summary', 'test2');
+addDevOrderride('extended-summary', 'test2'); // synchronous thread
+
+// race condition fixed
+(async function main () {
+    const res1 = await getFeatureState("extended-summary");
+    const res2 = await getFeatureState("feedback-dialog");
+
+    console.log({ res1, res2 });
+})();
